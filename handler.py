@@ -87,30 +87,33 @@ def handler(event):
         language = inp.get("language", "ru")
 
         # Базовые параметры
-        p_kwargs = dict(
+        base = dict(
             task_type="text2music",
             caption=tags,
             lyrics=lyrics,
             vocal_language=language,
             duration=duration,
         )
-        # Опциональные «плюшки» качества — добавим, если модель их принимает
+
+        # Опциональные «плюшки» качества (правильные имена параметров ACE-Step).
+        # Кладём в общий пул; ниже отфильтруем под то, что реально принимает класс.
+        opt = {}
         if inp.get("bpm"):
-            p_kwargs["bpm"] = int(inp["bpm"])
+            opt["bpm"] = int(inp["bpm"])
         if inp.get("seed") is not None:
-            p_kwargs["seed"] = int(inp["seed"])
-        if inp.get("infer_steps"):
-            p_kwargs["infer_steps"] = int(inp["infer_steps"])
-            p_kwargs["num_inference_steps"] = int(inp["infer_steps"])
-        if inp.get("guidance_scale"):
-            p_kwargs["guidance_scale"] = float(inp["guidance_scale"])
+            opt["seed"] = int(inp["seed"])
+        if inp.get("inference_steps"):                      # 1..200, выше = чище
+            opt["inference_steps"] = int(inp["inference_steps"])
+        if inp.get("guidance_scale"):                       # 1.0..15.0, выше = строже к тексту
+            opt["guidance_scale"] = float(inp["guidance_scale"])
+        if inp.get("lm_temperature"):                       # 0.7..0.85, ниже = точнее произношение
+            opt["lm_temperature"] = float(inp["lm_temperature"])
+        if inp.get("instrumental"):                         # True = без вокала
+            opt["instrumental"] = bool(inp["instrumental"])
 
-        params = GenerationParams(**_accepted_kwargs(GenerationParams, p_kwargs))
-
-        c_kwargs = dict(batch_size=1, audio_format="mp3")
-        if inp.get("seed") is not None:
-            c_kwargs["seed"] = int(inp["seed"])
-        config = GenerationConfig(**_accepted_kwargs(GenerationConfig, c_kwargs))
+        # Распределяем base+opt по тем полям, которые принимает каждый класс
+        params = GenerationParams(**_accepted_kwargs(GenerationParams, {**base, **opt}))
+        config = GenerationConfig(**_accepted_kwargs(GenerationConfig, {"batch_size": 1, "audio_format": "mp3", **opt}))
 
         os.makedirs(SAVE_DIR, exist_ok=True)
         result = generate_music(_STATE["dit"], _STATE["llm"], params, config, save_dir=SAVE_DIR)
