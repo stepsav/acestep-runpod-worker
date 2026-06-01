@@ -81,39 +81,24 @@ def handler(event):
         generate_music = ace_inf.generate_music
 
         inp = event.get("input", {}) or {}
-        lyrics = inp.get("lyrics", "")
-        tags = inp.get("tags") or inp.get("caption") or "pop"
-        duration = int(inp.get("duration", 30))
-        language = inp.get("language", "ru")
 
-        # Базовые параметры
-        base = dict(
-            task_type="text2music",
-            caption=tags,
-            lyrics=lyrics,
-            vocal_language=language,
-            duration=duration,
+        # Pass-through: принимаем ЛЮБЫЕ поля ACE-Step. Дружелюбные псевдонимы маппим
+        # на реальные имена, остальное идёт как есть. Несуществующие поля отфильтруются.
+        mapped = dict(inp)
+        if "tags" in mapped:
+            mapped.setdefault("caption", mapped.pop("tags"))
+        if "language" in mapped:
+            mapped.setdefault("vocal_language", mapped.pop("language"))
+
+        # Разумные значения по умолчанию (если бот не прислал)
+        mapped.setdefault("task_type", "text2music")
+        mapped.setdefault("vocal_language", "ru")
+
+        # Раздаём поля по тем классам, что их принимают (лишнее отфильтруется)
+        params = GenerationParams(**_accepted_kwargs(GenerationParams, mapped))
+        config = GenerationConfig(
+            **_accepted_kwargs(GenerationConfig, {"batch_size": 1, "audio_format": "mp3", **mapped})
         )
-
-        # Опциональные «плюшки» качества (правильные имена параметров ACE-Step).
-        # Кладём в общий пул; ниже отфильтруем под то, что реально принимает класс.
-        opt = {}
-        if inp.get("bpm"):
-            opt["bpm"] = int(inp["bpm"])
-        if inp.get("seed") is not None:
-            opt["seed"] = int(inp["seed"])
-        if inp.get("inference_steps"):                      # 1..200, выше = чище
-            opt["inference_steps"] = int(inp["inference_steps"])
-        if inp.get("guidance_scale"):                       # 1.0..15.0, выше = строже к тексту
-            opt["guidance_scale"] = float(inp["guidance_scale"])
-        if inp.get("lm_temperature"):                       # 0.7..0.85, ниже = точнее произношение
-            opt["lm_temperature"] = float(inp["lm_temperature"])
-        if inp.get("instrumental"):                         # True = без вокала
-            opt["instrumental"] = bool(inp["instrumental"])
-
-        # Распределяем base+opt по тем полям, которые принимает каждый класс
-        params = GenerationParams(**_accepted_kwargs(GenerationParams, {**base, **opt}))
-        config = GenerationConfig(**_accepted_kwargs(GenerationConfig, {"batch_size": 1, "audio_format": "mp3", **opt}))
 
         os.makedirs(SAVE_DIR, exist_ok=True)
         result = generate_music(_STATE["dit"], _STATE["llm"], params, config, save_dir=SAVE_DIR)
