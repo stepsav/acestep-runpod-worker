@@ -1,0 +1,10 @@
+{
+  "title": "ACE-Step 1.5 Song Generator (Serverless)",
+  "description": "Генерация песни из текста и стиля. Вокал на русском (vocal_language=ru).",
+  "type": "serverless",
+  "category": "audio",
+  "env": [
+    { "key": "ACESTEP_CONFIG_PATH", "value": "/app/checkpoints/acestep-v15-base" },
+    { "key": "ACESTEP_LM_MODEL_PATH", "value": "/app/checkpoints/acestep-5Hz-lm-1.7B" }
+  ]
+}
